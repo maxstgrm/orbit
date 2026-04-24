@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Orbit – Finde deine Leute</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --p: #7C3AED; --p2: #9F67F5; --p3: #EDE9FE;
+    --a: #EC4899; --a2: #FDF2F8;
+    --z: #F59E0B; --z2: #FEF3C7; /* zodiac gold */
+    --g: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%);
+    --gz: linear-gradient(135deg, #F59E0B 0%, #EC4899 100%); /* zodiac gradient */
+    --bg: #F7F6FD; --surface: #FFFFFF;
+    --text: #1E1B4B; --muted: #6B7280; --border: #E5E7EB;
+    --r: 20px; --r-sm: 12px;
+    --shadow: 0 4px 24px rgba(124,58,237,.10);
+  }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1E1B4B; }
+
+  /* ── APP SHELL ── */
+  #app { max-width: 430px; height: 100svh; margin: 0 auto; background: var(--bg); position: relative; overflow: hidden; }
+  .screen {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    opacity: 0; transform: translateX(60px); pointer-events: none;
+    transition: opacity .32s ease, transform .32s cubic-bezier(.4,0,.2,1);
+    overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+  .screen.active { opacity: 1; transform: translateX(0); pointer-events: all; }
+  .screen.exit   { opacity: 0; transform: translateX(-60px); }
+
+  /* ── TYPE ── */
+  h1 { font-size: 2rem; font-weight: 800; color: var(--text); line-height: 1.15; }
+  h2 { font-size: 1.35rem; font-weight: 700; color: var(--text); }
+  p  { color: var(--muted); line-height: 1.6; font-size: .95rem; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 16px 24px; border: none; border-radius: 50px; cursor: pointer;
+    font-size: 1rem; font-weight: 700; transition: transform .15s, box-shadow .15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--g); color: #fff; box-shadow: 0 4px 20px rgba(124,58,237,.3); }
+  .btn-ghost   { background: transparent; color: var(--p); border: 2px solid var(--p3); }
+  .btn-sm      { width: auto; padding: 10px 20px; font-size: .875rem; }
+  .btn-back-sm {
+    width: 52px; height: 52px; flex-shrink: 0; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-back-sm:active { background: var(--p3); }
+  .back-btn {
+    position: absolute; top: 16px; left: 16px; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,.2); display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; cursor: pointer; color: #fff; z-index: 5;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── INPUTS ── */
+  .input { width: 100%; padding: 16px 20px; border: 2px solid var(--border); border-radius: var(--r-sm); font-size: 1rem; color: var(--text); background: var(--surface); outline: none; transition: border-color .2s; }
+  .input:focus { border-color: var(--p); }
+
+  /* ── MISC ── */
+  .pill { display: inline-block; padding: 5px 13px; border-radius: 50px; font-size: .8rem; font-weight: 600; background: var(--p3); color: var(--p); }
+  .pill-accent { background: var(--a2); color: var(--a); }
+  .pill-zodiac { background: var(--z2); color: #92400E; }
+  .card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 20px; }
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+  .spacer { flex: 1; }
+
+  /* ════════════════════════════════════
+     SCREEN 0 – WELCOME
+  ════════════════════════════════════ */
+  #s-welcome { background: var(--g); align-items: center; justify-content: center; padding: 40px 32px; text-align: center; }
+  .welcome-logo { width: 90px; height: 90px; background: rgba(255,255,255,.2); border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; margin: 0 auto 28px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px rgba(0,0,0,.15); }
+  #s-welcome h1 { color: #fff; font-size: 2.8rem; }
+  #s-welcome p  { color: rgba(255,255,255,.75); margin: 12px 0 48px; }
+  #s-welcome .btn-primary { background: rgba(255,255,255,.25); backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,.4); box-shadow: none; }
+  .dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); }
+  .dot.active { background: #fff; width: 24px; border-radius: 4px; }
+
+  /* ════════════════════════════════════
+     SCREEN 1 – NAME
+  ════════════════════════════════════ */
+  #s-name { padding: 56px 28px 40px; }
+  #s-name .emoji-big { font-size: 3rem; margin-bottom: 16px; }
+  .avatar-picker { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin: 16px 0 24px; }
+  .av-opt { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer; border: 3px solid transparent; transition: border-color .2s, transform .2s; -webkit-tap-highlight-color: transparent; }
+  .av-opt.selected { border-color: var(--p); transform: scale(1.1); }
+
+  /* Zodiac picker on name screen */
+  .zodiac-section { margin-top: 24px; }
+  .zodiac-section-label { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 10px; }
+  .zodiac-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+  .zodiac-scroll::-webkit-scrollbar { display: none; }
+  .zodiac-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 10px 14px; border-radius: 14px;
+    background: var(--surface); border: 2px solid var(--border);
+    cursor: pointer; flex-shrink: 0; scroll-snap-align: start;
+    transition: border-color .2s, background .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .zodiac-chip.selected { border-color: var(--z); background: var(--z2); }
+  .zodiac-chip .zs { font-size: 1.3rem; }
+  .zodiac-chip .zn { font-size: .65rem; font-weight: 700; color: var(--muted); }
+  .zodiac-chip.selected .zn { color: #92400E; }
+
+  /* ════════════════════════════════════
+     SCREEN 2 – INTRO
+  ════════════════════════════════════ */
+  #s-intro { padding: 56px 0 40px; }
+  .intro-head { padding: 0 28px 20px; }
+  .ocean-pills { display: flex; flex-direction: column; gap: 10px; padding: 0 20px; }
+  .ocean-row { display: flex; align-items: center; gap: 14px; background: var(--surface); padding: 14px 16px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+  .ocean-icon { font-size: 1.4rem; }
+  .ocean-label { font-weight: 700; font-size: .95rem; color: var(--text); }
+  .ocean-desc  { font-size: .8rem; color: var(--muted); }
+
+  /* ════════════════════════════════════
+     SCREEN 3 – QUESTIONS
+  ════════════════════════════════════ */
+  #s-questions { padding: 0; }
+  .q-header { padding: 24px 28px 0; flex-shrink: 0; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--g); border-radius: 3px; transition: width .4s cubic-bezier(.4,0,.2,1); }
+  .q-counter { font-size: .82rem; color: var(--muted); font-weight: 600; }
+  .q-body { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 28px 28px 20px; gap: 24px; }
+  .q-dimension-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 50px; font-size: .78rem; font-weight: 700; background: var(--p3); color: var(--p); align-self: flex-start; }
+  .q-text { font-size: 1.2rem; font-weight: 700; color: var(--text); line-height: 1.4; }
+  .likert { display: flex; flex-direction: column; gap: 9px; }
+  .likert-opt { display: flex; align-items: center; gap: 14px; background: var(--surface); padding: 13px 18px; border-radius: 14px; cursor: pointer; border: 2px solid transparent; transition: border-color .2s, background .2s; -webkit-tap-highlight-color: transparent; }
+  .likert-opt.selected { border-color: var(--p); background: var(--p3); }
+  .likert-emoji { font-size: 1.35rem; }
+  .likert-label { font-size: .88rem; font-weight: 600; color: var(--text); }
+  .q-nav { display: flex; gap: 12px; padding: 0 28px 32px; flex-shrink: 0; }
+  .q-nav .btn { flex: 1; }
+
+  /* ════════════════════════════════════
+     SCREEN 4 – LOADING
+  ════════════════════════════════════ */
+  #s-loading { align-items: center; justify-content: center; background: var(--g); text-align: center; padding: 40px 32px; }
+  #s-loading h2, #s-loading p { color: #fff; }
+  #s-loading p { color: rgba(255,255,255,.75); margin-top: 10px; }
+  .orbit-anim { width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.15); display: flex; align-items: center; justify-content: center; font-size: 3rem; margin: 0 auto 32px; position: relative; animation: pulse 2s ease-in-out infinite; }
+  .orbit-ring { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); animation: spin 3s linear infinite; }
+  .orbit-ring.r1 { width: 150px; height: 150px; }
+  .orbit-ring.r2 { width: 190px; height: 190px; animation-duration: 5s; animation-direction: reverse; }
+  .orbit-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.7); top: -6px; left: 50%; transform: translateX(-50%); }
+  @keyframes spin  { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+  /* ════════════════════════════════════
+     SCREEN 5 – RESULTS / PROFIL
+  ════════════════════════════════════ */
+  #s-results { padding: 0 0 100px; }
+  .results-header { background: var(--g); padding: 56px 28px 80px; text-align: center; color: #fff; position: relative; }
+  .results-header h2 { color: #fff; font-size: 1.6rem; margin-top: 12px; }
+  .results-header p  { color: rgba(255,255,255,.8); margin-top: 6px; font-size: .95rem; }
+  .type-badge { display: inline-block; background: rgba(255,255,255,.25); padding: 5px 14px; border-radius: 50px; font-size: .82rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  /* Profile avatar in header top-right */
+  .profile-av-btn {
+    position: absolute; top: 18px; right: 18px;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(255,255,255,.25);
+    border: 2px solid rgba(255,255,255,.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    backdrop-filter: blur(8px);
+    transition: background .2s;
+  }
+  .profile-av-btn:active { background: rgba(255,255,255,.4); }
+
+  /* Sternzeichen Modus toggle on results */
+  .zodiac-mode-card {
+    background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow);
+    padding: 18px 20px; display: flex; align-items: center; gap: 14px; margin-top: 14px;
+  }
+  .zodiac-mode-icon { font-size: 2rem; flex-shrink: 0; }
+  .zodiac-mode-info { flex: 1; }
+  .zodiac-mode-info strong { font-size: .95rem; color: var(--text); display: block; }
+  .zodiac-mode-info span  { font-size: .8rem; color: var(--muted); }
+  .toggle {
+    position: relative; width: 48px; height: 28px; flex-shrink: 0;
+    background: var(--border); border-radius: 50px; cursor: pointer;
+    transition: background .3s; -webkit-tap-highlight-color: transparent;
+  }
+  .toggle.on { background: var(--z); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    transition: left .3s cubic-bezier(.4,0,.2,1);
+  }
+  .toggle.on::after { left: 23px; }
+
+  .results-card-wrapper { padding: 0 20px; margin-top: -48px; position: relative; z-index: 2; }
+  .radar-wrap { display: flex; justify-content: center; margin: 4px 0 8px; }
+  .ocean-bars { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+  .ocean-bar-row { display: flex; align-items: center; gap: 12px; }
+  .ocean-bar-label { font-size: .8rem; font-weight: 700; color: var(--text); width: 22px; flex-shrink: 0; }
+  .ocean-bar-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .ocean-bar-fill { height: 100%; border-radius: 4px; background: var(--g); transition: width 1s cubic-bezier(.4,0,.2,1); }
+  .ocean-bar-val { font-size: .8rem; font-weight: 700; color: var(--p); width: 32px; text-align: right; }
+  .trait-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .detail-label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
+
+  /* ════════════════════════════════════
+     SCREEN 6 – MATCHES
+  ════════════════════════════════════ */
+  #s-matches { padding: 0 0 80px; }
+  .matches-header {
+    background: var(--surface); padding: 56px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .matches-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .matches-header h2 { font-size: 1.3rem; }
+
+  /* Profile avatar button (top right in matches) */
+  .profile-chip {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--g); border: 2.5px solid var(--p3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .15s;
+    box-shadow: 0 2px 8px rgba(124,58,237,.25);
+  }
+  .profile-chip:active { transform: scale(.93); }
+
+  /* Zodiac mode toggle pill in matches header */
+  .zodiac-toggle-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 50px; font-size: .78rem; font-weight: 700;
+    border: 2px solid var(--border); cursor: pointer;
+    background: var(--surface); color: var(--muted);
+    transition: all .25s; -webkit-tap-highlight-color: transparent;
+    margin-top: 8px;
+  }
+  .zodiac-toggle-pill.on { background: var(--z2); border-color: var(--z); color: #92400E; }
+  .zodiac-toggle-pill .zt-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background .25s; }
+  .zodiac-toggle-pill.on .zt-dot { background: var(--z); }
+
+  .tab-bar { display: flex; gap: 4px; background: var(--bg); border-radius: 50px; padding: 4px; margin-top: 10px; }
+  .tab { flex: 1; text-align: center; padding: 9px; border-radius: 50px; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; -webkit-tap-highlight-color: transparent; }
+  .tab.active { background: var(--surface); color: var(--p); box-shadow: var(--shadow); }
+
+  .match-list { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+  .match-card {
+    background: var(--surface); border-radius: var(--r); padding: 16px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: var(--shadow); cursor: pointer;
+    transition: transform .15s; -webkit-tap-highlight-color: transparent;
+  }
+  .match-card:active { transform: scale(.98); }
+  .match-av { width: 54px; height: 54px; border-radius: 50%; background: var(--g); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; flex-shrink: 0; }
+  .match-info { flex: 1; min-width: 0; }
+  .match-name { font-weight: 700; font-size: .98rem; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .match-zodiac-badge { font-size: .8rem; }
+  .match-sub  { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+  .match-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+  .match-tag  { font-size: .7rem; font-weight: 600; background: var(--p3); color: var(--p); padding: 3px 9px; border-radius: 50px; }
+
+  .score-circle { width: 52px; height: 52px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--g); flex-shrink: 0; }
+  .score-circle.zodiac-on { background: var(--gz); }
+  .score-num { font-size: .95rem; font-weight: 800; color: #fff; line-height: 1; }
+  .score-pct { font-size: .55rem; color: rgba(255,255,255,.8); font-weight: 600; }
+
+  /* Group cards */
+  .group-card { background: var(--surface); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); cursor: pointer; transition: transform .15s; -webkit-tap-highlight-color: transparent; }
+  .group-card:active { transform: scale(.98); }
+  .group-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .group-name { font-weight: 700; font-size: .98rem; color: var(--text); }
+  .group-members { display: flex; margin-top: 6px; }
+  .group-av { width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid var(--surface); margin-right: -9px; font-size: .95rem; background: var(--g); display: flex; align-items: center; justify-content: center; }
+  .group-desc { font-size: .82rem; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .group-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  /* ════════════════════════════════════
+     SCREEN 7 – MATCH DETAIL
+  ════════════════════════════════════ */
+  #s-detail { padding: 0 0 100px; }
+  .detail-header { background: var(--g); padding: 56px 28px 96px; text-align: center; color: #fff; position: relative; }
+  .detail-av { width: 88px; height: 88px; border-radius: 50%; background: rgba(255,255,255,.25); font-size: 2.8rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; border: 3px solid rgba(255,255,255,.5); }
+  .detail-header h2 { color: #fff; font-size: 1.5rem; }
+  .detail-header p  { color: rgba(255,255,255,.8); font-size: .9rem; margin-top: 4px; }
+  .detail-score-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.25); padding: 6px 16px; border-radius: 50px; font-weight: 800; color: #fff; font-size: 1rem; margin-top: 10px; }
+  .detail-card-wrap { padding: 0 20px; margin-top: -60px; position: relative; z-index: 2; }
+  .mini-radar { display: flex; justify-content: center; margin: 4px 0; }
+  .connect-bar { display: flex; gap: 10px; padding: 16px 20px; margin-top: 4px; }
+
+  /* Zodiac compat row in detail */
+  .zodiac-compat-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--z2); border-radius: 14px; padding: 12px 16px;
+    margin-top: 14px;
+  }
+  .zodiac-compat-row .zicons { font-size: 1.4rem; letter-spacing: 2px; }
+  .zodiac-compat-row .ztext { flex: 1; }
+  .zodiac-compat-row .ztitle { font-size: .88rem; font-weight: 700; color: #92400E; }
+  .zodiac-compat-row .zsub   { font-size: .75rem; color: #B45309; }
+  .zodiac-score-pill { background: var(--z); color: #fff; border-radius: 50px; padding: 4px 10px; font-size: .78rem; font-weight: 800; }
+
+  /* ════════════════════════════════════
+     SCREEN 8 – CHAT
+  ════════════════════════════════════ */
+  #s-chat { padding: 0 0 80px; }
+  .chat-header {
+    background: var(--surface); padding: 56px 20px 14px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .chat-header h2 { font-size: 1.3rem; }
+  .chat-new-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--p3); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .chat-list { display: flex; flex-direction: column; }
+  .chat-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 20px; cursor: pointer; border-bottom: 1px solid var(--border);
+    transition: background .15s; -webkit-tap-highlight-color: transparent;
+    background: var(--surface);
+  }
+  .chat-row:active { background: var(--bg); }
+  .chat-av { width: 52px; height: 52px; border-radius: 50%; background: var(--g); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; position: relative; }
+  .chat-online { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; background: #10B981; border: 2px solid var(--surface); }
+  .chat-info { flex: 1; min-width: 0; }
+  .chat-name { font-weight: 700; font-size: .95rem; color: var(--text); }
+  .chat-preview { font-size: .82rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .chat-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
+  .chat-time { font-size: .72rem; color: var(--muted); }
+  .chat-unread { background: var(--p); color: #fff; border-radius: 50px; min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 800; padding: 0 5px; }
+
+  /* CHAT DETAIL */
+  #s-chat-detail { padding: 0; }
+  .chat-detail-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 56px 16px 14px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; }
+  .chat-detail-back { font-size: 1.3rem; cursor: pointer; color: var(--p); padding: 4px; -webkit-tap-highlight-color: transparent; }
+  .chat-detail-av { width: 40px; height: 40px; border-radius: 50%; background: var(--g); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+  .chat-detail-info { flex: 1; }
+  .chat-detail-name { font-weight: 700; font-size: .95rem; color: var(--text); }
+  .chat-detail-status { font-size: .75rem; color: #10B981; font-weight: 600; }
+  .messages { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .msg { max-width: 80%; display: flex; flex-direction: column; gap: 3px; }
+  .msg.them { align-self: flex-start; }
+  .msg.me   { align-self: flex-end; }
+  .msg-bubble { padding: 11px 15px; border-radius: 18px; font-size: .9rem; line-height: 1.45; }
+  .msg.them .msg-bubble { background: var(--surface); color: var(--text); border-bottom-left-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .msg.me   .msg-bubble { background: var(--g); color: #fff; border-bottom-right-radius: 4px; }
+  .msg-time { font-size: .68rem; color: var(--muted); padding: 0 4px; }
+  .msg.me .msg-time { text-align: right; }
+  .chat-input-bar { background: var(--surface); border-top: 1px solid var(--border); padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+  .chat-input { flex: 1; background: var(--bg); border: none; border-radius: 50px; padding: 12px 18px; font-size: .9rem; outline: none; color: var(--text); }
+  .chat-send { width: 42px; height: 42px; border-radius: 50%; background: var(--g); border: none; display: flex; align-items: center; justify-content: center; font-size: 1rem; cursor: pointer; -webkit-tap-highlight-color: transparent; flex-shrink: 0; }
+
+  /* ════════════════════════════════════
+     BOTTOM NAV
+  ════════════════════════════════════ */
+  #bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 430px;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: none; padding: 8px 0 env(safe-area-inset-bottom, 8px);
+    z-index: 100;
+  }
+  .nav-items { display: flex; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; padding: 4px 0; color: var(--muted); font-size: .68rem; font-weight: 700; transition: color .2s; -webkit-tap-highlight-color: transparent; }
+  .nav-item.active { color: var(--p); }
+  .nav-icon { font-size: 1.3rem; }
+  .nav-badge { position: relative; }
+  .nav-dot { position: absolute; top: -2px; right: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--a); border: 2px solid var(--surface); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── S0: WELCOME ─────────────────────────────────────── -->
+  <div class="screen active" id="s-welcome">
+    <div class="welcome-logo">🌐</div>
+    <h1>Orbit</h1>
+    <p>Finde Menschen, die wirklich zu dir passen – keine Dates, echte Freundschaften.</p>
+    <div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+    <button class="btn btn-primary" onclick="goTo('s-name')">Jetzt starten ✦</button>
+    <div style="height:14px"></div>
+    <button class="btn" style="background:rgba(255,255,255,.15);color:rgba(255,255,255,.8);border:2px solid rgba(255,255,255,.3)" onclick="goTo('s-name')">Ich hab schon ein Profil</button>
+  </div>
+
+  <!-- ── S1: NAME + ZODIAC ───────────────────────────────── -->
+  <div class="screen" id="s-name">
+    <div class="emoji-big">👋</div>
+    <h2>Wer bist du?</h2>
+    <p style="margin:8px 0 20px">Wähle dein Emoji, deinen Namen und dein Sternzeichen.</p>
+
+    <div class="avatar-picker" id="av-picker">
+      <div class="av-opt selected" data-em="😎" onclick="selectAv(this)">😎</div>
+      <div class="av-opt" data-em="🦋" onclick="selectAv(this)">🦋</div>
+      <div class="av-opt" data-em="🐺" onclick="selectAv(this)">🐺</div>
+      <div class="av-opt" data-em="🦁" onclick="selectAv(this)">🦁</div>
+      <div class="av-opt" data-em="🌊" onclick="selectAv(this)">🌊</div>
+      <div class="av-opt" data-em="🔥" onclick="selectAv(this)">🔥</div>
+      <div class="av-opt" data-em="🌙" onclick="selectAv(this)">🌙</div>
+      <div class="av-opt" data-em="⚡" onclick="selectAv(this)">⚡</div>
+    </div>
+
+    <input class="input" id="name-input" type="text" placeholder="Dein Name…" maxlength="24">
+
+    <div class="zodiac-section">
+      <div class="zodiac-section-label">✦ Dein Sternzeichen</div>
+      <div class="zodiac-scroll" id="zodiac-scroll">
+        <!-- rendered by JS -->
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+    <button class="btn btn-primary" onclick="submitName()" style="margin-top:24px">Weiter →</button>
+  </div>
+
+  <!-- ── S2: INTRO ───────────────────────────────────────── -->
+  <div class="screen" id="s-intro">
+    <div class="intro-head">
+      <h2>Der Big Five Test</h2>
+      <p style="margin-top:8px">10 Fragen · 2 Minuten · wissenschaftlich fundiert</p>
+    </div>
+    <div class="ocean-pills">
+      <div class="ocean-row"><span class="ocean-icon">🌍</span><div><div class="ocean-label">Offenheit</div><div class="ocean-desc">Kreativität, Neugier, Fantasie</div></div></div>
+      <div class="ocean-row"><span class="ocean-icon">📋</span><div><div class="ocean-label">Gewissenhaftigkeit</div><div class="ocean-desc">Organisation, Disziplin, Verlässlichkeit</div></div></div>
+      <div class="ocean-row"><span class="ocean-icon">🎉</span><div><div class="ocean-label">Extraversion</div><div class="ocean-desc">Geselligkeit, Energie, Offenheit</div></div></div>
+      <div class="ocean-row"><span class="ocean-icon">🤝</span><div><div class="ocean-label">Verträglichkeit</div><div class="ocean-desc">Empathie, Kooperation, Vertrauen</div></div></div>
+      <div class="ocean-row"><span class="ocean-icon">🌊</span><div><div class="ocean-label">Neurotizismus</div><div class="ocean-desc">Emotionale Stabilität, Sensibilität</div></div></div>
+    </div>
+    <div style="padding:24px 20px 40px">
+      <button class="btn btn-primary" onclick="startTest()">Test starten 🚀</button>
+    </div>
+  </div>
+
+  <!-- ── S3: QUESTIONS ───────────────────────────────────── -->
+  <div class="screen" id="s-questions">
+    <div class="q-header">
+      <div class="progress-bar"><div class="progress-fill" id="q-progress" style="width:10%"></div></div>
+      <div class="q-counter" id="q-counter">Frage 1 von 10</div>
+    </div>
+    <div class="q-body" id="q-body"></div>
+    <div class="q-nav">
+      <button class="btn-back-sm" id="q-back-btn" onclick="prevQuestion()">←</button>
+      <button class="btn btn-primary" id="q-next-btn" onclick="nextQuestion()" disabled>Weiter</button>
+    </div>
+  </div>
+
+  <!-- ── S4: LOADING ─────────────────────────────────────── -->
+  <div class="screen" id="s-loading">
+    <div class="orbit-anim">
+      <div class="orbit-ring r1"><div class="orbit-dot"></div></div>
+      <div class="orbit-ring r2"><div class="orbit-dot"></div></div>
+      🌐
+    </div>
+    <h2>Orbit analysiert dich…</h2>
+    <p id="loading-text">Berechne dein Persönlichkeitsprofil</p>
+  </div>
+
+  <!-- ── S5: RESULTS / PROFIL ────────────────────────────── -->
+  <div class="screen" id="s-results">
+    <div class="results-header">
+      <!-- Profile avatar top-right → back to matches -->
+      <div class="profile-av-btn" id="results-back-btn" onclick="goBackToMatches()" style="display:none">←</div>
+      <div class="type-badge" id="type-badge">Typ</div>
+      <h2 id="type-name">–</h2>
+      <p id="type-desc">–</p>
+    </div>
+    <div class="results-card-wrapper">
+      <div class="card">
+        <div class="radar-wrap"><svg id="radar" width="220" height="220" viewBox="-110 -110 220 220"></svg></div>
+        <div class="divider"></div>
+        <div class="ocean-bars" id="ocean-bars"></div>
+        <div class="divider"></div>
+        <div class="detail-label">Deine Stärken</div>
+        <div class="trait-pills" id="trait-pills"></div>
+      </div>
+
+      <!-- Sternzeichen Modus Toggle -->
+      <div class="zodiac-mode-card" id="zodiac-mode-card">
+        <div class="zodiac-mode-icon">✨</div>
+        <div class="zodiac-mode-info">
+          <strong>Sternzeichen Modus</strong>
+          <span id="zodiac-mode-sub">Dein Sternzeichen fließt ins Matching ein</span>
+        </div>
+        <div class="toggle" id="zodiac-toggle" onclick="toggleZodiacMode()"></div>
+      </div>
+
+      <div style="height:16px"></div>
+      <button class="btn btn-primary" onclick="findMatches()">Matches finden 🎯</button>
+    </div>
+  </div>
+
+  <!-- ── S6: MATCHES ─────────────────────────────────────── -->
+  <div class="screen" id="s-matches">
+    <div class="matches-header">
+      <div class="matches-header-top">
+        <div>
+          <h2>Deine Matches</h2>
+          <p style="font-size:.82rem;color:var(--muted);margin-top:1px">Basierend auf deinem OCEAN-Profil</p>
+        </div>
+        <!-- Profile avatar chip – top right -->
+        <div class="profile-chip" id="profile-chip" onclick="openProfile()">😎</div>
+      </div>
+      <!-- Zodiac mode pill -->
+      <div class="zodiac-toggle-pill" id="zodiac-pill" onclick="toggleZodiacMode(); rebuildMatchList()">
+        <div class="zt-dot"></div>
+        <span>✨ Sternzeichen Modus</span>
+        <span id="zodiac-pill-label" style="opacity:.6"></span>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active" id="tab-people" onclick="switchTab('people')">👤 Personen</div>
+        <div class="tab" id="tab-groups" onclick="switchTab('groups')">👥 Gruppen</div>
+      </div>
+    </div>
+    <div class="match-list" id="match-list"></div>
+    <div class="match-list" id="group-list" style="display:none"></div>
+  </div>
+
+  <!-- ── S7: MATCH DETAIL ────────────────────────────────── -->
+  <div class="screen" id="s-detail">
+    <div class="detail-header" id="detail-header">
+      <div class="back-btn" onclick="goBack()">←</div>
+      <div class="detail-av" id="detail-av">😎</div>
+      <h2 id="detail-name">–</h2>
+      <p id="detail-sub">–</p>
+      <div class="detail-score-badge"><span id="detail-score-icon">✦</span> <span id="detail-score">–</span>% Match</div>
+    </div>
+    <div class="detail-card-wrap">
+      <div class="card">
+        <div class="detail-label">Persönlichkeit</div>
+        <div class="mini-radar"><svg id="radar-mini" width="160" height="160" viewBox="-80 -80 160 160"></svg></div>
+        <div id="zodiac-compat-section"></div>
+        <div class="divider"></div>
+        <div class="detail-label">Interessen</div>
+        <div class="trait-pills" id="detail-tags"></div>
+        <div class="divider"></div>
+        <div class="detail-label">Warum ihr matcht</div>
+        <p id="detail-why" style="font-size:.88rem"></p>
+      </div>
+      <div class="connect-bar">
+        <button class="btn btn-primary" onclick="openChatWith()">Nachricht schicken 💬</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S8: CHAT LIST ───────────────────────────────────── -->
+  <div class="screen" id="s-chat">
+    <div class="chat-header">
+      <h2>Nachrichten</h2>
+      <div class="chat-new-btn" onclick="alert('Neuen Chat starten – kommt mit Supabase! 🚀')">✏️</div>
+    </div>
+    <div class="chat-list" id="chat-list"></div>
+    <div style="padding:20px;text-align:center;color:var(--muted);font-size:.85rem" id="chat-empty" style="display:none">
+      Noch keine Matches zum Chatten.<br>Finde erst deine Leute! 🎯
+    </div>
+  </div>
+
+  <!-- ── S9: CHAT DETAIL ─────────────────────────────────── -->
+  <div class="screen" id="s-chat-detail">
+    <div class="chat-detail-header">
+      <div class="chat-detail-back" onclick="goBack()">‹</div>
+      <div class="chat-detail-av" id="cd-av">😎</div>
+      <div class="chat-detail-info">
+        <div class="chat-detail-name" id="cd-name">–</div>
+        <div class="chat-detail-status">Online</div>
+      </div>
+    </div>
+    <div class="messages" id="cd-messages"></div>
+    <div class="chat-input-bar">
+      <input class="chat-input" id="cd-input" placeholder="Nachricht…" onkeydown="if(event.key==='Enter')sendMsg()">
+      <button class="chat-send" onclick="sendMsg()">➤</button>
+    </div>
+  </div>
+
+  <!-- ── BOTTOM NAV ──────────────────────────────────────── -->
+  <nav id="bottom-nav">
+    <div class="nav-items">
+      <div class="nav-item active" id="nav-matches" onclick="navTo('s-matches','nav-matches')">
+        <div class="nav-icon">🎯</div>Matches
+      </div>
+      <div class="nav-item" id="nav-groups" onclick="switchTab('groups');navTo('s-matches','nav-matches')">
+        <div class="nav-icon">👥</div>Gruppen
+      </div>
+      <div class="nav-item" id="nav-chat" onclick="navTo('s-chat','nav-chat')">
+        <div class="nav-badge"><div class="nav-icon">💬</div><div class="nav-dot" id="chat-dot"></div></div>
+        Chat
+      </div>
+    </div>
+  </nav>
+
+</div><!-- #app -->
+
+<script>
+/* ══════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════ */
+const state = {
+  name: 'Du', avatar: '😎',
+  zodiacKey: null,    // selected zodiac key
+  zodiacMode: false,  // toggle
+  currentQ: 0,
+  answers: new Array(10).fill(null),
+  ocean: { O:0, C:0, E:0, A:0, N:0 },
+  history: [],
+  activeChatProfile: null,
+};
+
+/* ══════════════════════════════════════════════════
+   ZODIAC DATA
+══════════════════════════════════════════════════ */
+const ZODIAC = [
+  { key:'widder',     sym:'♈', name:'Widder',     el:'fire'  },
+  { key:'stier',      sym:'♉', name:'Stier',      el:'earth' },
+  { key:'zwillinge',  sym:'♊', name:'Zwillinge',  el:'air'   },
+  { key:'krebs',      sym:'♋', name:'Krebs',      el:'water' },
+  { key:'loewe',      sym:'♌', name:'Löwe',       el:'fire'  },
+  { key:'jungfrau',   sym:'♍', name:'Jungfrau',   el:'earth' },
+  { key:'waage',      sym:'♎', name:'Waage',      el:'air'   },
+  { key:'skorpion',   sym:'♏', name:'Skorpion',   el:'water' },
+  { key:'schuetze',   sym:'♐', name:'Schütze',    el:'fire'  },
+  { key:'steinbock',  sym:'♑', name:'Steinbock',  el:'earth' },
+  { key:'wassermann', sym:'♒', name:'Wassermann', el:'air'   },
+  { key:'fische',     sym:'♓', name:'Fische',     el:'water' },
+];
+
+const ZODIAC_MAP = Object.fromEntries(ZODIAC.map(z => [z.key, z]));
+
+// Element compatibility (0–100)
+const EL_COMPAT = {
+  fire:  { fire:92, air:85, earth:58, water:48 },
+  earth: { earth:90, water:85, fire:55, air:60  },
+  air:   { air:90, fire:82, water:62, earth:58  },
+  water: { water:92, earth:85, air:60, fire:50  },
+};
+
+function zodiacCompat(keyA, keyB) {
+  if (!keyA || !keyB) return null;
+  const elA = ZODIAC_MAP[keyA]?.el;
+  const elB = ZODIAC_MAP[keyB]?.el;
+  if (!elA || !elB) return null;
+  return EL_COMPAT[elA][elB];
+}
+
+const COMPAT_LABEL = score =>
+  score >= 88 ? { label:'Perfekte Harmonie', icon:'🔥' } :
+  score >= 78 ? { label:'Starke Verbindung', icon:'✨' } :
+  score >= 65 ? { label:'Gute Energie',      icon:'🌟' } :
+               { label:'Spannende Gegensätze', icon:'⚡' };
+
+/* ══════════════════════════════════════════════════
+   RENDER ZODIAC PICKER
+══════════════════════════════════════════════════ */
+function renderZodiacPicker() {
+  const el = document.getElementById('zodiac-scroll');
+  el.innerHTML = ZODIAC.map(z => `
+    <div class="zodiac-chip" id="zc-${z.key}" onclick="selectZodiac('${z.key}')">
+      <span class="zs">${z.sym}</span>
+      <span class="zn">${z.name}</span>
+    </div>
+  `).join('');
+}
+renderZodiacPicker();
+
+function selectZodiac(key) {
+  state.zodiacKey = key;
+  document.querySelectorAll('.zodiac-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('zc-' + key)?.classList.add('selected');
+}
+
+/* ══════════════════════════════════════════════════
+   AVATAR
+══════════════════════════════════════════════════ */
+function selectAv(el) {
+  document.querySelectorAll('.av-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  state.avatar = el.dataset.em;
+}
+
+function submitName() {
+  const val = document.getElementById('name-input').value.trim();
+  if (!val) { document.getElementById('name-input').focus(); return; }
+  state.name = val;
+  goTo('s-intro');
+}
+
+/* ══════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════ */
+let current = 's-welcome';
+
+function goTo(id) {
+  if (id === current) return;
+  const curr = document.getElementById(current);
+  const next = document.getElementById(id);
+  curr.classList.add('exit');
+  curr.classList.remove('active');
+  next.classList.add('active');
+  setTimeout(() => curr.classList.remove('exit'), 400);
+  state.history.push(current);
+  current = id;
+  next.scrollTop = 0;
+}
+
+function goBack() {
+  if (!state.history.length) return;
+  const prev = state.history.pop();
+  const curr = document.getElementById(current);
+  curr.classList.remove('active');
+  document.getElementById(prev).classList.add('active');
+  current = prev;
+}
+
+function navTo(id, navId) {
+  // Switch main screen without history
+  const curr = document.getElementById(current);
+  curr.classList.remove('active');
+  document.getElementById(id).classList.add('active');
+  current = id;
+  state.history = [];
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(navId).classList.add('active');
+}
+
+function openProfile() {
+  // Show profile/results from matches screen
+  document.getElementById('results-back-btn').style.display = 'flex';
+  goTo('s-results');
+}
+
+function goBackToMatches() {
+  goBack();
+}
+
+/* ══════════════════════════════════════════════════
+   QUESTIONS
+══════════════════════════════════════════════════ */
+const QUESTIONS = [
+  { dim:'O', icon:'🌍', label:'Offenheit',         text:'Ich probiere gerne neue Dinge aus und bin offen für ungewöhnliche Ideen.' },
+  { dim:'O', icon:'🌍', label:'Offenheit',         text:'Ich habe ein lebhaftes Vorstellungsvermögen und denke oft kreativ.' },
+  { dim:'C', icon:'📋', label:'Gewissenhaftigkeit', text:'Ich erledige Aufgaben gründlich und pünktlich.' },
+  { dim:'C', icon:'📋', label:'Gewissenhaftigkeit', text:'Ich bin sehr organisiert und halte mich an Pläne.' },
+  { dim:'E', icon:'🎉', label:'Extraversion',       text:'Ich bin gerne in großen Gruppen und fühle mich auf Partys wohl.' },
+  { dim:'E', icon:'🎉', label:'Extraversion',       text:'Ich knüpfe leicht neue Kontakte und rede gerne mit Fremden.' },
+  { dim:'A', icon:'🤝', label:'Verträglichkeit',   text:'Ich helfe anderen gerne, auch wenn es mir Aufwand kostet.' },
+  { dim:'A', icon:'🤝', label:'Verträglichkeit',   text:'Ich vertraue den meisten Menschen und gehe offen auf sie zu.' },
+  { dim:'N', icon:'🌊', label:'Neurotizismus',      text:'Ich mache mir oft Sorgen und werde leicht nervös.' },
+  { dim:'N', icon:'🌊', label:'Neurotizismus',      text:'Stressige Situationen belasten mich emotional stark.' },
+];
+const LIKERT = [
+  { val:1, emoji:'😤', label:'Stimme gar nicht zu' },
+  { val:2, emoji:'🙁', label:'Stimme eher nicht zu' },
+  { val:3, emoji:'😐', label:'Unentschieden' },
+  { val:4, emoji:'🙂', label:'Stimme eher zu' },
+  { val:5, emoji:'😍', label:'Stimme voll zu' },
+];
+
+function startTest() {
+  state.currentQ = 0;
+  state.answers = new Array(10).fill(null);
+  renderQuestion();
+  goTo('s-questions');
+}
+
+function renderQuestion() {
+  const i = state.currentQ;
+  const q = QUESTIONS[i];
+  document.getElementById('q-progress').style.width = ((i+1)/10*100) + '%';
+  document.getElementById('q-counter').textContent = `Frage ${i+1} von 10`;
+  document.getElementById('q-back-btn').style.opacity = i === 0 ? '0.3' : '1';
+  document.getElementById('q-back-btn').disabled = i === 0;
+  const nextBtn = document.getElementById('q-next-btn');
+  nextBtn.textContent = i === 9 ? 'Abschließen ✓' : 'Weiter';
+  nextBtn.disabled = state.answers[i] === null;
+  document.getElementById('q-body').innerHTML = `
+    <div>
+      <div class="q-dimension-badge">${q.icon} ${q.label}</div>
+      <div class="q-text" style="margin-top:12px">${q.text}</div>
+    </div>
+    <div class="likert">
+      ${LIKERT.map(l => `
+        <div class="likert-opt ${state.answers[i]===l.val?'selected':''}" onclick="selectAnswer(${l.val})">
+          <span class="likert-emoji">${l.emoji}</span>
+          <span class="likert-label">${l.label}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function selectAnswer(val) {
+  state.answers[state.currentQ] = val;
+  document.querySelectorAll('.likert-opt').forEach((el,i) => el.classList.toggle('selected', LIKERT[i].val===val));
+  document.getElementById('q-next-btn').disabled = false;
+}
+
+function nextQuestion() {
+  if (state.answers[state.currentQ] === null) return;
+  if (state.currentQ < 9) { state.currentQ++; renderQuestion(); }
+  else finishTest();
+}
+
+function prevQuestion() {
+  if (state.currentQ > 0) { state.currentQ--; renderQuestion(); }
+}
+
+/* ══════════════════════════════════════════════════
+   OCEAN CALC
+══════════════════════════════════════════════════ */
+function calcOcean() {
+  const a = state.answers;
+  const avg = (x,y) => Math.round(((a[x]+a[y])/2 - 1) / 4 * 100);
+  state.ocean = { O:avg(0,1), C:avg(2,3), E:avg(4,5), A:avg(6,7), N:avg(8,9) };
+}
+
+/* ══════════════════════════════════════════════════
+   PERSONALITY TYPES
+══════════════════════════════════════════════════ */
+const TYPES = [
+  { test:o=>o.O>70&&o.E>60,  badge:'🌍 Entdecker',    name:'Der Entdecker',    desc:'Neugierig, kreativ und immer bereit für neue Abenteuer.' },
+  { test:o=>o.C>70&&o.A>60,  badge:'📋 Macher',       name:'Der Macher',       desc:'Zuverlässig, strukturiert und ein starker Teamplayer.' },
+  { test:o=>o.E>70&&o.A>60,  badge:'🎉 Connector',    name:'Der Connector',    desc:'Gesellig, warmherzig und bringt immer Energie in die Gruppe.' },
+  { test:o=>o.O>70&&o.E<45,  badge:'🎨 Kreativer',    name:'Der Kreative',     desc:'Introvertiert, tief und voller einzigartiger Ideen.' },
+  { test:o=>o.N<35&&o.C>55,  badge:'🧠 Stratege',     name:'Der Stratege',     desc:'Ruhig, analysierend und immer einen Plan weiter.' },
+  { test:()=>true,            badge:'⚡ Individualist', name:'Der Individualist', desc:'Einzigartig und schwer in eine Schublade zu stecken.' },
+];
+const getType = () => TYPES.find(t => t.test(state.ocean));
+
+function getTraits() {
+  const o = state.ocean;
+  const t = [];
+  if (o.O>65) t.push('Kreativ'); if (o.O>75) t.push('Neugierig');
+  if (o.C>65) t.push('Zuverlässig'); if (o.C>75) t.push('Organisiert');
+  if (o.E>65) t.push('Gesellig'); if (o.E>75) t.push('Energiegeladen');
+  if (o.A>65) t.push('Empathisch'); if (o.A>75) t.push('Verständnisvoll');
+  if (o.N<40) t.push('Ausgeglichen'); if (o.N<25) t.push('Stressresistent');
+  return t.length ? t : ['Vielseitig','Authentisch','Interessant'];
+}
+
+/* ══════════════════════════════════════════════════
+   PROFILES
+══════════════════════════════════════════════════ */
+const PROFILES = [
+  { name:'Leon',   age:24, emoji:'🦁', zodiac:'loewe',      ocean:{O:78,C:55,E:82,A:68,N:28}, tags:['Musik','Basketball','Reisen','Konzerte'],  why:'Beide sehr extrovertiert und offen. Hohe Übereinstimmung bei Offenheit.' },
+  { name:'Sophie', age:22, emoji:'🦋', zodiac:'fische',     ocean:{O:85,C:72,E:42,A:88,N:40}, tags:['Kunst','Lesen','Kochen','Museen'],         why:'Beide kreativ und einfühlsam. Ihr ergänzt euch bei Extraversion perfekt.' },
+  { name:'Niklas', age:26, emoji:'🐺', zodiac:'steinbock',  ocean:{O:60,C:88,E:65,A:72,N:22}, tags:['Tech','Wandern','Kaffee','Podcasts'],       why:'Ähnliche Gewissenhaftigkeit und emotionale Stabilität.' },
+  { name:'Mia',    age:23, emoji:'🌙', zodiac:'wassermann', ocean:{O:92,C:48,E:55,A:82,N:50}, tags:['Fotografie','Yoga','Festivals','Film'],     why:'Beide sehr offen und kreativ. Perfekt für spontane Abenteuer.' },
+  { name:'Felix',  age:25, emoji:'⚡', zodiac:'widder',     ocean:{O:70,C:65,E:90,A:60,N:30}, tags:['Sport','Gaming','Street Food','Partys'],   why:'Hohe Energie und Extraversion – ihr würdet zusammen richtig Spaß haben.' },
+  { name:'Lena',   age:21, emoji:'🔥', zodiac:'schuetze',  ocean:{O:82,C:76,E:50,A:90,N:38}, tags:['Tanzen','Nachhaltig','Bücher','Reisen'],   why:'Sehr verträglich und offen – eine tiefe, ehrliche Freundschaft.' },
+];
+
+const GROUPS = [
+  { name:'Abenteurer-Crew', emoji:'🏔️', members:['🦁','🌙','⚡'], tags:['Outdoor','Reisen','Spontan'],     desc:'Spontane Wochenendtrips, Klettern, Festivals. Für Menschen, die immer "Ja" sagen.', score:89 },
+  { name:'Creative Lab',    emoji:'🎨', members:['🦋','🌙','🔥'], tags:['Kunst','Film','Fotografie'],      desc:'Kreative Köpfe, die gemeinsam Projekte starten und sich gegenseitig inspirieren.',  score:83 },
+  { name:'Tech & Chill',   emoji:'💻', members:['🐺','⚡','🦁'], tags:['Tech','Gaming','Podcasts'],        desc:'Über Startups reden, neue Apps entdecken, gemeinsam bauen. Lässige Nerd-Energie.',  score:77 },
+  { name:'Deep Talk Club',  emoji:'🧠', members:['🦋','🔥','🌙'], tags:['Philosophie','Bücher','Seele'],   desc:'Für alle, die lieber über den Sinn des Lebens reden als über das Wetter.',          score:74 },
+];
+
+/* ══════════════════════════════════════════════════
+   SIMILARITY
+══════════════════════════════════════════════════ */
+function oceanSimilarity(a, b) {
+  const dims = ['O','C','E','A','N'];
+  const dist = Math.sqrt(dims.reduce((acc,d) => acc + Math.pow(a[d]-b[d],2), 0));
+  return Math.round((1 - dist / Math.sqrt(5*100*100)) * 100);
+}
+
+function combinedScore(profile) {
+  const ocean = oceanSimilarity(state.ocean, profile.ocean);
+  if (!state.zodiacMode || !state.zodiacKey) return ocean;
+  const zc = zodiacCompat(state.zodiacKey, profile.zodiac);
+  return zc !== null ? Math.round(ocean * 0.7 + zc * 0.3) : ocean;
+}
+
+/* ══════════════════════════════════════════════════
+   ZODIAC MODE TOGGLE
+══════════════════════════════════════════════════ */
+function toggleZodiacMode() {
+  state.zodiacMode = !state.zodiacMode;
+  // Update toggle on results screen
+  document.getElementById('zodiac-toggle').classList.toggle('on', state.zodiacMode);
+  // Update pill on matches screen
+  const pill = document.getElementById('zodiac-pill');
+  pill.classList.toggle('on', state.zodiacMode);
+  const zd = ZODIAC_MAP[state.zodiacKey];
+  document.getElementById('zodiac-pill-label').textContent = zd ? `${zd.sym} ${zd.name}` : '';
+  // Sub-text on results
+  const zSub = document.getElementById('zodiac-mode-sub');
+  if (zSub) zSub.textContent = state.zodiacMode
+    ? `Aktiv – ${zd ? zd.sym + ' ' + zd.name : 'kein Sternzeichen gewählt'} fließt ein`
+    : 'Dein Sternzeichen fließt ins Matching ein';
+}
+
+function rebuildMatchList() {
+  buildMatchList();
+}
+
+/* ══════════════════════════════════════════════════
+   RADAR CHART
+══════════════════════════════════════════════════ */
+function drawRadar(svgId, ocean, r=90) {
+  const svg = document.getElementById(svgId);
+  if (!svg) return;
+  const labels = ['O','C','E','A','N'];
+  const colors = { O:'#7C3AED',C:'#EC4899',E:'#F59E0B',A:'#10B981',N:'#3B82F6' };
+  const n = 5;
+  const angles = labels.map((_,i) => i/n * Math.PI*2 - Math.PI/2);
+  const vals = labels.map(l => ocean[l]/100);
+  let html = '';
+  [.25,.5,.75,1].forEach(fr => {
+    const pts = angles.map(a => `${Math.cos(a)*r*fr},${Math.sin(a)*r*fr}`).join(' ');
+    html += `<polygon points="${pts}" fill="none" stroke="#E5E7EB" stroke-width="1"/>`;
+  });
+  angles.forEach(a => { html += `<line x1="0" y1="0" x2="${Math.cos(a)*r}" y2="${Math.sin(a)*r}" stroke="#E5E7EB" stroke-width="1"/>`; });
+  const pts = vals.map((v,i) => `${Math.cos(angles[i])*r*v},${Math.sin(angles[i])*r*v}`).join(' ');
+  html += `<polygon points="${pts}" fill="rgba(124,58,237,.18)" stroke="url(#rg${svgId})" stroke-width="2.5" stroke-linejoin="round"/>`;
+  vals.forEach((v,i) => {
+    const x = Math.cos(angles[i])*r*v, y = Math.sin(angles[i])*r*v;
+    html += `<circle cx="${x}" cy="${y}" r="${r<85?4:5}" fill="${colors[labels[i]]}" stroke="#fff" stroke-width="2"/>`;
+  });
+  labels.forEach((l,i) => {
+    const x = Math.cos(angles[i])*(r+18), y = Math.sin(angles[i])*(r+18);
+    html += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="${r<85?'11':'12'}" font-weight="700" fill="${colors[l]}">${l}</text>`;
+  });
+  svg.innerHTML = `<defs><linearGradient id="rg${svgId}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#EC4899"/></linearGradient></defs>${html}`;
+}
+
+/* ══════════════════════════════════════════════════
+   FINISH TEST
+══════════════════════════════════════════════════ */
+function finishTest() {
+  calcOcean();
+  goTo('s-loading');
+  const msgs = ['Berechne dein Persönlichkeitsprofil…','Durchsuche potenzielle Matches…','Analysiere Gruppenkompatibilität…','Fast fertig…'];
+  let mi = 0;
+  const lt = document.getElementById('loading-text');
+  const iv = setInterval(() => { if (mi < msgs.length-1) { mi++; lt.textContent = msgs[mi]; } }, 850);
+  setTimeout(() => {
+    clearInterval(iv);
+    buildResults();
+    goTo('s-results');
+    document.getElementById('bottom-nav').style.display = 'block';
+  }, 3400);
+}
+
+/* ══════════════════════════════════════════════════
+   BUILD RESULTS
+══════════════════════════════════════════════════ */
+function buildResults() {
+  const type = getType();
+  document.getElementById('type-badge').textContent = type.badge;
+  document.getElementById('type-name').textContent = type.name;
+  document.getElementById('type-desc').textContent = type.desc;
+  drawRadar('radar', state.ocean, 90);
+  const labels = { O:'Offenheit',C:'Gewissenhaftigkeit',E:'Extraversion',A:'Verträglichkeit',N:'Neurotizismus' };
+  document.getElementById('ocean-bars').innerHTML = Object.entries(state.ocean).map(([k,v]) => `
+    <div class="ocean-bar-row">
+      <div class="ocean-bar-label">${k}</div>
+      <div class="ocean-bar-track"><div class="ocean-bar-fill" style="width:${v}%"></div></div>
+      <div class="ocean-bar-val">${v}%</div>
+    </div>`).join('');
+  document.getElementById('trait-pills').innerHTML = getTraits().map(t => `<span class="pill">${t}</span>`).join('');
+
+  // Zodiac mode card – update sub label with current zodiac
+  const zd = ZODIAC_MAP[state.zodiacKey];
+  const sub = document.getElementById('zodiac-mode-sub');
+  if (sub) sub.textContent = zd ? `${zd.sym} ${zd.name} kann ins Matching einfließen` : 'Kein Sternzeichen gewählt';
+  // Profile avatar update
+  document.getElementById('profile-chip').textContent = state.avatar;
+}
+
+/* ══════════════════════════════════════════════════
+   MATCHES
+══════════════════════════════════════════════════ */
+function findMatches() {
+  buildMatchList();
+  buildGroupList();
+  buildChatList();
+  // Sync zodiac pill
+  const pill = document.getElementById('zodiac-pill');
+  pill.classList.toggle('on', state.zodiacMode);
+  const zd = ZODIAC_MAP[state.zodiacKey];
+  document.getElementById('zodiac-pill-label').textContent = zd ? `${zd.sym} ${zd.name}` : '';
+  goTo('s-matches');
+}
+
+function buildMatchList() {
+  const sorted = PROFILES
+    .map(p => ({ ...p, score: combinedScore(p) }))
+    .sort((a,b) => b.score - a.score);
+
+  const zd = ZODIAC_MAP[state.zodiacKey];
+  document.getElementById('match-list').innerHTML = sorted.map(p => {
+    const zp = ZODIAC_MAP[p.zodiac];
+    return `
+    <div class="match-card" onclick="openDetail('${p.name}')">
+      <div class="match-av">${p.emoji}</div>
+      <div class="match-info">
+        <div class="match-name">
+          ${p.name}, ${p.age}
+          ${state.zodiacMode && zp ? `<span class="match-zodiac-badge">${zp.sym}</span>` : ''}
+        </div>
+        <div class="match-sub">${p.tags.slice(0,3).join(' · ')}</div>
+        <div class="match-tags">${p.tags.map(t=>`<span class="match-tag">${t}</span>`).join('')}</div>
+      </div>
+      <div class="score-circle ${state.zodiacMode ? 'zodiac-on' : ''}">
+        <div class="score-num">${p.score}</div>
+        <div class="score-pct">${state.zodiacMode ? '✨' : '%'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildGroupList() {
+  document.getElementById('group-list').innerHTML = GROUPS.map(g => `
+    <div class="group-card">
+      <div class="group-top">
+        <div>
+          <div class="group-name">${g.emoji} ${g.name}</div>
+          <div class="group-members" style="margin-top:8px">
+            ${g.members.map(m=>`<div class="group-av">${m}</div>`).join('')}
+            <div class="group-av" style="background:var(--p3);color:var(--p);font-size:.65rem;font-weight:800">+${Math.floor(Math.random()*4+2)}</div>
+          </div>
+        </div>
+        <div class="score-circle"><div class="score-num">${g.score}</div><div class="score-pct">%</div></div>
+      </div>
+      <div class="group-tags">${g.tags.map(t=>`<span class="pill pill-accent">${t}</span>`).join('')}</div>
+      <div class="group-desc">${g.desc}</div>
+      <div style="height:12px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="alert('Feature kommt mit Supabase-Backend! 🚀')">Gruppe anfragen</button>
+    </div>`).join('');
+}
+
+function switchTab(tab) {
+  const p = tab === 'people';
+  document.getElementById('tab-people').classList.toggle('active', p);
+  document.getElementById('tab-groups').classList.toggle('active', !p);
+  document.getElementById('match-list').style.display = p ? 'flex' : 'none';
+  document.getElementById('group-list').style.display = p ? 'none' : 'flex';
+}
+
+/* ══════════════════════════════════════════════════
+   DETAIL
+══════════════════════════════════════════════════ */
+function openDetail(name) {
+  const p = PROFILES.find(x => x.name === name);
+  if (!p) return;
+  state.activeChatProfile = p;
+  const score = combinedScore(p);
+  document.getElementById('detail-av').textContent = p.emoji;
+  document.getElementById('detail-name').textContent = `${p.name}, ${p.age}`;
+  document.getElementById('detail-sub').textContent = `${oceanSimilarity(state.ocean,p.ocean)}% OCEAN-Übereinstimmung`;
+  document.getElementById('detail-score').textContent = score;
+  document.getElementById('detail-score-icon').textContent = state.zodiacMode ? '✨' : '✦';
+  document.getElementById('detail-tags').innerHTML = p.tags.map(t=>`<span class="pill">${t}</span>`).join('');
+  document.getElementById('detail-why').textContent = p.why;
+  drawRadar('radar-mini', p.ocean, 60);
+
+  // Zodiac compat section
+  const zSec = document.getElementById('zodiac-compat-section');
+  if (state.zodiacMode && state.zodiacKey && p.zodiac) {
+    const zc = zodiacCompat(state.zodiacKey, p.zodiac);
+    const userZ = ZODIAC_MAP[state.zodiacKey];
+    const profZ = ZODIAC_MAP[p.zodiac];
+    const cl = COMPAT_LABEL(zc);
+    zSec.innerHTML = `
+      <div class="zodiac-compat-row">
+        <div class="zicons">${userZ.sym}${profZ.sym}</div>
+        <div class="ztext">
+          <div class="ztitle">${cl.icon} ${cl.label}</div>
+          <div class="zsub">${userZ.name} + ${profZ.name}</div>
+        </div>
+        <div class="zodiac-score-pill">${zc}%</div>
+      </div>`;
+  } else {
+    zSec.innerHTML = '';
+  }
+  goTo('s-detail');
+}
+
+function openChatWith() {
+  if (!state.activeChatProfile) return;
+  openChatDetail(state.activeChatProfile);
+}
+
+/* ══════════════════════════════════════════════════
+   CHAT
+══════════════════════════════════════════════════ */
+const MOCK_MSGS = {
+  'Leon':   [
+    { me:false, text:'Hey! Orbit hat uns gematcht – krass dass wir 84% haben 😄', t:'10:22' },
+    { me:true,  text:'Ja total! Magst du auch Konzerte?', t:'10:25' },
+    { me:false, text:'Immer! Nächsten Freitag ist was in der Halle – kommst du?', t:'10:26' },
+    { me:true,  text:'Bin dabei! 🔥', t:'10:27' },
+  ],
+  'Sophie': [
+    { me:false, text:'Hi! Ich hab gesehen du magst auch Museen?', t:'Gestern' },
+    { me:true,  text:'Ja, besonders zeitgenössische Kunst 🎨', t:'Gestern' },
+    { me:false, text:'Perfekt – Museum Brandhorst morgen?', t:'Gestern' },
+  ],
+  'Niklas': [
+    { me:false, text:'Moin! Tech & Wandern – das ist eine coole Kombi haha', t:'Mo' },
+    { me:true,  text:'Produktivitäts-Podcast hören beim Wandern ist Peak 😂', t:'Mo' },
+  ],
+  'Mia':    [
+    { me:false, text:'Dein Orbit-Profil sieht interessant aus!', t:'Di' },
+    { me:true,  text:'Danke! Deins auch 😊 Wassermann?', t:'Di' },
+    { me:false, text:'Ja! ♒ Sternzeichen Modus ist so eine gute Idee', t:'Di' },
+  ],
+  'Felix':  [
+    { me:false, text:'Wann spielst du nächstes Mal? 🎮', t:'Fr' },
+    { me:true,  text:'Heute Abend – CS2, bist du dabei?', t:'Fr' },
+    { me:false, text:'100% in!', t:'Fr' },
+  ],
+  'Lena':   [
+    { me:false, text:'Hey! ♐ Schütze x Schütze – das wird wild 😄', t:'Mi' },
+    { me:true,  text:'Haha wir sind wahrscheinlich beide total spontan', t:'Mi' },
+  ],
+};
+
+const CHAT_ONLINE = ['Leon','Mia','Felix'];
+
+function buildChatList() {
+  const el = document.getElementById('chat-list');
+  el.innerHTML = PROFILES.map(p => {
+    const msgs = MOCK_MSGS[p.name] || [];
+    const last = msgs[msgs.length-1];
+    const unread = msgs.filter(m=>!m.me).length % 3; // mock unread
+    const online = CHAT_ONLINE.includes(p.name);
+    return `
+    <div class="chat-row" onclick="openChatDetail(PROFILES.find(x=>x.name==='${p.name}'))">
+      <div class="chat-av">
+        ${p.emoji}
+        ${online ? '<div class="chat-online"></div>' : ''}
+      </div>
+      <div class="chat-info">
+        <div class="chat-name">${p.name}</div>
+        <div class="chat-preview">${last ? (last.me ? 'Du: ' : '') + last.text : 'Starte die Unterhaltung!'}</div>
+      </div>
+      <div class="chat-meta">
+        <div class="chat-time">${last?.t || ''}</div>
+        ${unread > 0 ? `<div class="chat-unread">${unread}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  // Hide badge once opened
+  document.getElementById('chat-dot').style.display = 'none';
+}
+
+function openChatDetail(p) {
+  if (!p) return;
+  state.activeChatProfile = p;
+  document.getElementById('cd-av').textContent = p.emoji;
+  document.getElementById('cd-name').textContent = p.name;
+  const msgs = [...(MOCK_MSGS[p.name] || [])];
+  renderMessages(msgs);
+  document.getElementById('s-chat-detail')._msgs = msgs;
+  document.getElementById('s-chat-detail')._profile = p;
+  goTo('s-chat-detail');
+  setTimeout(() => {
+    const m = document.getElementById('cd-messages');
+    m.scrollTop = m.scrollHeight;
+  }, 50);
+}
+
+function renderMessages(msgs) {
+  document.getElementById('cd-messages').innerHTML = msgs.map(m => `
+    <div class="msg ${m.me?'me':'them'}">
+      <div class="msg-bubble">${m.text}</div>
+      <div class="msg-time">${m.t}</div>
+    </div>`).join('');
+}
+
+function sendMsg() {
+  const input = document.getElementById('cd-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const screen = document.getElementById('s-chat-detail');
+  const msgs = screen._msgs || [];
+  const now = new Date();
+  msgs.push({ me:true, text, t: `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}` });
+  screen._msgs = msgs;
+  renderMessages(msgs);
+  setTimeout(() => {
+    document.getElementById('cd-messages').scrollTop = 999999;
+    // Mock reply after 1.2s
+    setTimeout(() => {
+      const replies = ['😄', 'Cool!', 'Ja auf jeden Fall!', 'Haha nice 😂', 'Absolut!', 'Wann?', '👍'];
+      msgs.push({ me:false, text: replies[Math.floor(Math.random()*replies.length)], t: `${now.getHours()}:${String(now.getMinutes()+1).padStart(2,'0')}` });
+      screen._msgs = msgs;
+      renderMessages(msgs);
+      document.getElementById('cd-messages').scrollTop = 999999;
+    }, 1200);
+  }, 50);
+}
+
+/* ══════════════════════════════════════════════════
+   KEYBOARD
+══════════════════════════════════════════════════ */
+document.getElementById('name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitName();
+});
+
+// Show chat notification dot initially
+document.getElementById('chat-dot').style.display = 'block';
+</script>
+</body>
+</html>
