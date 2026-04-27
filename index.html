@@ -129,7 +129,7 @@
   .email-form { display:flex; flex-direction:column; gap:10px; margin-top:4px; }
   .email-form .input { border-radius:14px; }
   .login-hint { font-size:.75rem; color:var(--muted); text-align:center; margin-top:16px; line-height:1.5; }
-  .login-error { font-size:.82rem; color:#EF4444; text-align:center; margin-top:4px; display:none; }
+  .login-error { font-size:.82rem; color:#EF4444; text-align:center; margin-top:4px; display:none; white-space:pre-line; line-height:1.5; }
 
   /* ══════════════════════════════════
      S1 – NAME / PHOTO
@@ -358,7 +358,7 @@
 
   <!-- S0: WELCOME -->
   <div class="screen active" id="s-welcome">
-    <div class="version-badge">v0.1 dev</div>
+    <div class="version-badge">v0.2 dev</div>
     <div class="orbit-bg">
       <div class="orb-track orb-t1"></div>
       <div class="orb-track orb-t2"></div>
@@ -741,10 +741,16 @@ function setLoginMode(mode){
 function nameFromEmail(email){ return (email||'').split('@')[0].replace(/[._-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).trim()||'Nutzer'; }
 
 async function loginWithProvider(provider){
-  if(!_sb){ showLoginError('Backend nicht erreichbar – bitte später versuchen.'); return; }
+  if(!_sb){ showLoginError('Backend nicht erreichbar – bitte per E-Mail anmelden.'); return; }
   showAuthLoading(`Mit ${provider==='apple'?'Apple':'Google'} anmelden…`,'Weiterleitung…');
   const {error}=await _sb.auth.signInWithOAuth({provider,options:{redirectTo:window.location.href}});
-  if(error){ hideAuthLoading(); showLoginError(error.message); }
+  hideAuthLoading();
+  if(error){
+    const notEnabled=error.status===400||error.message?.toLowerCase().includes('not enabled')||error.message?.toLowerCase().includes('validation_failed')||error.message?.toLowerCase().includes('unsupported');
+    showLoginError(notEnabled
+      ?`${provider==='apple'?'Apple':'Google'}-Login ist noch nicht eingerichtet.\nBitte per E-Mail anmelden.`
+      :error.message);
+  }
 }
 
 async function loginWithEmail(){
