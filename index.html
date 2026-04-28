@@ -157,13 +157,19 @@
   .zodiac-section { margin-top:18px; }
   .section-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:10px; display:flex; align-items:center; gap:7px; }
   .opt-tag { font-size:.6rem; background:var(--border); color:var(--muted); padding:2px 7px; border-radius:50px; font-weight:600; text-transform:none; letter-spacing:0; }
-  .zodiac-scroll { display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; }
-  .zodiac-scroll::-webkit-scrollbar { display:none; }
-  .zodiac-chip { display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 12px; border-radius:13px; background:var(--surface); border:2px solid var(--border); cursor:pointer; flex-shrink:0; transition:border-color .2s,background .2s; -webkit-tap-highlight-color:transparent; }
-  .zodiac-chip.selected { border-color:var(--z); background:var(--z2); }
-  .zodiac-chip .zs { font-size:1.2rem; }
-  .zodiac-chip .zn { font-size:.6rem; font-weight:700; color:var(--muted); }
-  .zodiac-chip.selected .zn { color:#92400E; }
+  /* Birth data form */
+  .birth-row { display:flex; gap:8px; margin-bottom:10px; }
+  .birth-row .input:first-child { flex:2; }
+  .birth-row .input:last-child  { flex:1; min-width:0; font-size:.9rem; }
+  .birth-city-row { display:flex; gap:8px; align-items:center; }
+  .birth-city-row .input { flex:1; }
+  .btn-loc { width:52px; height:52px; flex-shrink:0; border-radius:14px; background:var(--p3); border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:1.2rem; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background .2s; }
+  .btn-loc:active { background:var(--p2); }
+  .astro-card { background:var(--surface); border-radius:14px; padding:13px 16px; margin-top:12px; border:1.5px solid var(--border); display:none; flex-direction:column; gap:9px; }
+  .astro-row { display:flex; align-items:center; justify-content:space-between; }
+  .astro-label { font-size:.82rem; color:var(--muted); font-weight:600; }
+  .astro-val { font-size:.9rem; font-weight:700; color:var(--text); }
+  .astro-hint { font-size:.76rem; color:var(--muted); text-align:center; padding:2px 0; font-style:italic; }
 
   /* ══════════════════════════════════
      S2 – INTRO
@@ -359,7 +365,7 @@
 
   <!-- S0: WELCOME -->
   <div class="screen active" id="s-welcome">
-    <div class="version-badge">v0.3 dev</div>
+    <div class="version-badge">v0.4 dev</div>
     <div class="orbit-bg">
       <div class="orb-track orb-t1"></div>
       <div class="orb-track orb-t2"></div>
@@ -449,8 +455,26 @@
     </div>
 
     <div class="zodiac-section" style="padding:0 24px">
-      <div class="section-label">✦ Sternzeichen <span class="opt-tag">optional</span></div>
-      <div class="zodiac-scroll" id="zodiac-scroll"></div>
+      <div class="section-label">🌟 Geburtsdaten <span class="opt-tag">optional</span></div>
+      <div class="birth-row">
+        <input class="input" type="date" id="birth-date" onchange="calcAstro()">
+        <input class="input" type="time" id="birth-time" placeholder="Uhrzeit" onchange="calcAstro()">
+      </div>
+      <div class="birth-city-row">
+        <input class="input" type="text" id="birth-city" placeholder="Geburtsort (Stadt)…" oninput="debouncedCalcAstro()">
+        <button class="btn-loc" onclick="useCurrentLocation()" title="Standort nutzen">📍</button>
+      </div>
+      <div class="astro-card" id="astro-card">
+        <div class="astro-row">
+          <span class="astro-label">☀️ Sonnenzeichen</span>
+          <span class="astro-val" id="astro-sun">–</span>
+        </div>
+        <div class="astro-row" id="astro-asc-row" style="display:none">
+          <span class="astro-label">⬆️ Aszendent</span>
+          <span class="astro-val" id="astro-asc">–</span>
+        </div>
+        <div class="astro-hint" id="astro-hint" style="display:none">Uhrzeit + Geburtsort eingeben für Aszendent</div>
+      </div>
     </div>
 
     <div style="padding:20px 24px 40px; margin-top:auto">
@@ -636,7 +660,8 @@
 const state = {
   name:'Du', avatar:'😎', email:'',
   photos:[], activePhoto:null,
-  zodiacKey:null, zodiacMode:false,
+  zodiacKey:null, ascendantKey:null, zodiacMode:false,
+  birthDate:null, birthTime:null, birthCity:null, birthLat:null, birthLon:null,
   currentQ:0, answers:new Array(10).fill(null),
   ocean:{O:50,C:50,E:50,A:50,N:50},
   history:[], activeChatProfile:null,
@@ -657,8 +682,109 @@ const EC={fire:{fire:92,air:85,earth:58,water:48},earth:{earth:90,water:85,fire:
 const zComp=(a,b)=>{ const ea=ZM[a]?.el,eb=ZM[b]?.el; return ea&&eb?EC[ea][eb]:null; };
 const compatLbl=s=>s>=88?{l:'Perfekte Harmonie',i:'🔥'}:s>=78?{l:'Starke Verbindung',i:'✨'}:s>=65?{l:'Gute Energie',i:'🌟'}:{l:'Spannende Gegensätze',i:'⚡'};
 
-document.getElementById('zodiac-scroll').innerHTML=ZODIAC.map(z=>`<div class="zodiac-chip" id="zc-${z.key}" onclick="selectZodiac('${z.key}')"><span class="zs">${z.sym}</span><span class="zn">${z.name}</span></div>`).join('');
-function selectZodiac(k){ state.zodiacKey=k; document.querySelectorAll('.zodiac-chip').forEach(c=>c.classList.remove('selected')); document.getElementById('zc-'+k)?.classList.add('selected'); }
+/* ── ASTRO CALCULATION ── */
+function _toRad(d){return d*Math.PI/180;}
+function _toDeg(r){return r*180/Math.PI;}
+
+function _julianDay(y,m,d,h,mi,lon){
+  const utH=h+mi/60-lon/15; // approx UTC via longitude
+  let day=d+utH/24,year=y,month=m;
+  if(month<=2){year--;month+=12;}
+  const A=Math.floor(year/100),B=2-A+Math.floor(A/4);
+  return Math.floor(365.25*(year+4716))+Math.floor(30.6001*(month+1))+day+B-1524.5;
+}
+
+function calcAscendantDeg(year,month,day,hour,minute,lat,lon){
+  const JD=_julianDay(year,month,day,hour,minute,lon);
+  const T=(JD-2451545.0)/36525.0;
+  let GMST=280.46061837+360.98564736629*(JD-2451545)+0.000387933*T*T-T*T*T/38710000;
+  GMST=((GMST%360)+360)%360;
+  const LST=((GMST+lon)%360+360)%360;
+  const eps=23.4397-0.0130*T;
+  const RAMC=_toRad(LST),e=_toRad(eps),φ=_toRad(lat);
+  let asc=_toDeg(Math.atan2(-Math.cos(RAMC),Math.sin(RAMC)*Math.cos(e)+Math.tan(φ)*Math.sin(e)));
+  return((asc%360)+360)%360;
+}
+
+const SUN_RANGES=[
+  [3,21],[4,20],[5,21],[6,21],[7,23],[8,23],
+  [9,23],[10,23],[11,22],[12,22],[1,20],[2,19],[3,21]
+];
+function getSunSignIdx(month,day){
+  for(let i=0;i<12;i++){
+    const[sm,sd]=SUN_RANGES[i],[em,ed]=SUN_RANGES[i+1];
+    if((month===sm&&day>=sd)||(month===em&&day<ed))return i;
+  }
+  return 11;
+}
+
+let _geoTimer=null;
+function debouncedCalcAstro(){clearTimeout(_geoTimer);_geoTimer=setTimeout(calcAstro,900);}
+
+async function geocodeCity(city){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`,{headers:{'Accept-Language':'de'}});
+    const d=await r.json();
+    if(d.length)return{lat:parseFloat(d[0].lat),lon:parseFloat(d[0].lon)};
+  }catch(e){}
+  return null;
+}
+
+async function calcAstro(){
+  const dateVal=document.getElementById('birth-date').value;
+  if(!dateVal)return;
+  const timeVal=document.getElementById('birth-time').value;
+  const cityVal=document.getElementById('birth-city').value.trim();
+
+  const[year,month,day]=dateVal.split('-').map(Number);
+  const sunIdx=getSunSignIdx(month,day);
+  const sunZ=ZODIAC[sunIdx];
+  state.zodiacKey=sunZ.key;
+  state.birthDate=dateVal;
+
+  const card=document.getElementById('astro-card');
+  const ascRow=document.getElementById('astro-asc-row');
+  const hint=document.getElementById('astro-hint');
+  card.style.display='flex';
+  document.getElementById('astro-sun').textContent=`${sunZ.sym} ${sunZ.name}`;
+
+  if(timeVal&&cityVal){
+    document.getElementById('astro-asc').textContent='…';
+    ascRow.style.display='flex'; hint.style.display='none';
+    const[h,mi]=timeVal.split(':').map(Number);
+    const coords=await geocodeCity(cityVal);
+    if(coords){
+      state.birthLat=coords.lat; state.birthLon=coords.lon;
+      state.birthCity=cityVal; state.birthTime=timeVal;
+      const ascDeg=calcAscendantDeg(year,month,day,h,mi,coords.lat,coords.lon);
+      const ascIdx=Math.floor(ascDeg/30)%12;
+      state.ascendantKey=ZODIAC[ascIdx].key;
+      document.getElementById('astro-asc').textContent=`${ZODIAC[ascIdx].sym} ${ZODIAC[ascIdx].name}`;
+    }else{
+      document.getElementById('astro-asc').textContent='Ort nicht gefunden';
+    }
+  }else{
+    ascRow.style.display='none';
+    hint.style.display='block';
+  }
+}
+
+async function useCurrentLocation(){
+  if(!navigator.geolocation){alert('Geolocation nicht verfügbar.');return;}
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    state.birthLat=pos.coords.latitude; state.birthLon=pos.coords.longitude;
+    try{
+      const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${state.birthLat}&lon=${state.birthLon}&format=json`,{headers:{'Accept-Language':'de'}});
+      const d=await r.json();
+      const city=d.address?.city||d.address?.town||d.address?.village||'Aktueller Standort';
+      document.getElementById('birth-city').value=city;
+      state.birthCity=city;
+    }catch(e){
+      document.getElementById('birth-city').value=`${state.birthLat.toFixed(2)}, ${state.birthLon.toFixed(2)}`;
+    }
+    calcAstro();
+  },()=>alert('Standort konnte nicht ermittelt werden.'));
+}
 
 /* ── SUPABASE ── */
 const SUPABASE_URL='https://wnblmxenvbmnwvweaacp.supabase.co';
@@ -688,8 +814,11 @@ async function loadProfileAndNavigate(user){
         state.name=profile.name||nameFromEmail(user.email);
         state.avatar=profile.avatar||'😎';
         state.zodiacKey=profile.zodiac_key||null;
+        state.ascendantKey=profile.ascendant_key||null;
+        state.birthDate=profile.birth_date||null;
+        state.birthTime=profile.birth_time||null;
+        state.birthCity=profile.birth_city||null;
         state.ocean={O:profile.ocean_o??50,C:profile.ocean_c??50,E:profile.ocean_e??50,A:profile.ocean_a??50,N:profile.ocean_n??50};
-        if(state.zodiacKey){ document.querySelectorAll('.zodiac-chip').forEach(c=>c.classList.remove('selected')); document.getElementById('zc-'+state.zodiacKey)?.classList.add('selected'); }
         hideAuthLoading();
         buildResults(); findMatches();
         document.getElementById('bottom-nav').style.display='block';
@@ -714,6 +843,12 @@ async function saveProfile(){
       ocean_o:state.ocean.O, ocean_c:state.ocean.C, ocean_e:state.ocean.E,
       ocean_a:state.ocean.A, ocean_n:state.ocean.N,
       zodiac_key:state.zodiacKey||null,
+      ascendant_key:state.ascendantKey||null,
+      birth_date:state.birthDate||null,
+      birth_time:state.birthTime||null,
+      birth_city:state.birthCity||null,
+      birth_lat:state.birthLat||null,
+      birth_lon:state.birthLon||null,
     });
   }catch(e){ console.warn('Save profile error',e); }
 }
@@ -783,7 +918,7 @@ async function loginWithEmail(){
 
   if(result.error){ showLoginError(result.error.message); return; }
   if(result.data?.user){ await loadProfileAndNavigate(result.data.user); }
-  else { showLoginError('Bitte bestätige deine E-Mail-Adresse, dann kannst du dich einloggen.',true); }
+  else { showLoginError('Konto erstellt – aber E-Mail-Bestätigung ist aktiviert.\n\nFix: Supabase → Authentication → Providers → Email → „Confirm email" deaktivieren.',true); }
 }
 
 /* ── PHOTOS ── */
@@ -960,9 +1095,13 @@ function buildResults(){
   drawRadar('radar',state.ocean,90);
   document.getElementById('ocean-bars').innerHTML=Object.entries(state.ocean).map(([k,v])=>`<div class="ocean-bar-row"><div class="ocean-bar-label">${k}</div><div class="ocean-bar-track"><div class="ocean-bar-fill" style="width:${v}%"></div></div><div class="ocean-bar-val">${v}%</div></div>`).join('');
   document.getElementById('trait-pills').innerHTML=getTraits().map(t=>`<span class="pill">${t}</span>`).join('');
-  const zd=ZM[state.zodiacKey];
+  const zd=ZM[state.zodiacKey],ad=ZM[state.ascendantKey];
   const sub=document.getElementById('zodiac-mode-sub');
-  if(sub)sub.textContent=zd?`${zd.sym} ${zd.name} kann ins Matching einfließen`:'Kein Sternzeichen gewählt';
+  if(sub){
+    if(zd&&ad) sub.textContent=`☀️ ${zd.sym} ${zd.name} · ⬆️ ${ad.sym} ${ad.name}`;
+    else if(zd) sub.textContent=`${zd.sym} ${zd.name} kann ins Matching einfließen`;
+    else sub.textContent='Geburtsdaten eingeben für Sternzeichen-Matching';
+  }
   const chip=document.getElementById('profile-chip');
   if(chip){ if(state.activePhoto)chip.innerHTML=`<img src="${state.activePhoto}">`;else chip.textContent=state.avatar; }
 }
